@@ -19,7 +19,7 @@ export const route: Route = {
 
         const $ = load(html);
 
-        const item = $('a')
+        const links = $('a')
             .toArray()
             .map((el) => {
                 const title = $(el).text().trim();
@@ -37,6 +37,31 @@ export const route: Route = {
                 }
             })
             .filter(Boolean);
+
+        const item = await Promise.all(
+            links.map(async (entry: any) => {
+                const articleHtml = await ofetch(entry.link);
+
+                const article = load(articleHtml);
+
+                const content = article('div.clearfix').clone();
+
+                // 删除正文中的重复标题
+                content.find('h1').remove();
+
+                // 删除空白元素
+                content.find('.lead').remove();
+                content.find('.clear').remove();
+
+                const description = content.html() ?? '';
+
+                return {
+                    title: entry.title,
+                    link: entry.link,
+                    description,
+                };
+            })
+        );
 
         return {
             title: 'Port of Los Angeles News',
