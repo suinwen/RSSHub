@@ -43,52 +43,52 @@ export const route: Route = {
             .filter(Boolean)
             .slice(0, 30);
 
-        const item = [];
+        const item = (
+            await Promise.all(
+                links.map(async (entry: any) => {
+                    try {
+                        const articleHtml = await ofetch(entry.link, {
+                            timeout: 10000,
+                        });
 
-        for (const entry of links) {
-            try {
-                const articleHtml = await ofetch(entry.link, {
-                    timeout: 10000,
-                });
+                        const article = load(articleHtml);
 
-                const article = load(articleHtml);
+                        const content = article(
+                            '#section-about .clearfix'
+                        ).clone();
 
-                const content = article('div.clearfix').clone();
+                        // 删除重复标题
+                        content.find('h1').remove();
 
-                content.find('h1').remove();
-                content.find('.lead').remove();
-                content.find('.clear').remove();
+                        // 删除空白元素
+                        content.find('.lead').remove();
+                        content.find('.clear').remove();
 
-                const description = content.html() ?? '';
+                        const description = content.html() ?? '';
 
-                const pubDate =
-                    content.find('strong').first().text().trim() || undefined;
+                        return {
+                            title: entry.title,
+                            link: entry.link,
+                            description,
+                        };
+                    } catch (error) {
+                        console.log(`Skip: ${entry.link}`);
 
-                item.push({
-                    title: entry.title,
-                    link: entry.link,
-                    description,
-                    pubDate,
-                });
-            } catch (error) {
-                console.log(`Skip: ${entry.link}`);
-
-                item.push({
-                    title: entry.title,
-                    link: entry.link,
-                });
-            }
-        }
-
-        const unique = Array.from(
-            new Map(item.map((v) => [v.link, v])).values()
-        );
+                        return {
+                            title: entry.title,
+                            link: entry.link,
+                        };
+                    }
+                })
+            )
+        ).filter(Boolean);
 
         return {
             title: 'Port of Los Angeles News',
             link: 'https://www.portoflosangeles.org',
-            description: 'Latest news releases from the Port of Los Angeles',
-            item: unique,
+            description:
+                'Latest news releases from the Port of Los Angeles',
+            item,
         };
     },
 };
