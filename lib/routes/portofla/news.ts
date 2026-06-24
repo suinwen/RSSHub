@@ -32,9 +32,13 @@ export const route: Route = {
                 ) {
                     return {
                         title,
-                        link: `https://portoflosangeles.org${href}`,
+                        link: href.startsWith('http')
+                            ? href
+                            : `https://www.portoflosangeles.org${href}`,
                     };
                 }
+
+                return null;
             })
             .filter(Boolean);
 
@@ -46,7 +50,7 @@ export const route: Route = {
 
                 const content = article('div.clearfix').clone();
 
-                // 删除正文中的重复标题
+                // 删除正文中的标题
                 content.find('h1').remove();
 
                 // 删除空白元素
@@ -65,7 +69,7 @@ export const route: Route = {
 
         return {
             title: 'Port of Los Angeles News',
-            link: 'https://portoflosangeles.org',
+            link: 'https://www.portoflosangeles.org',
             item,
         };
     },
