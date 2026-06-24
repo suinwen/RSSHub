@@ -14,7 +14,7 @@ export const route: Route = {
 
     handler: async () => {
         const html = await ofetch(
-            'https://portoflosangeles.org/news/news-release-archive'
+            'https://www.portoflosangeles.org/news/news-release-archive'
         );
 
         const $ = load(html);
@@ -40,37 +40,55 @@ export const route: Route = {
 
                 return null;
             })
-            .filter(Boolean);
+            .filter(Boolean)
+            .slice(0, 30);
 
-        const item = await Promise.all(
-            links.map(async (entry: any) => {
-                const articleHtml = await ofetch(entry.link);
+        const item = [];
+
+        for (const entry of links) {
+            try {
+                const articleHtml = await ofetch(entry.link, {
+                    timeout: 10000,
+                });
 
                 const article = load(articleHtml);
 
                 const content = article('div.clearfix').clone();
 
-                // 删除正文中的标题
                 content.find('h1').remove();
-
-                // 删除空白元素
                 content.find('.lead').remove();
                 content.find('.clear').remove();
 
                 const description = content.html() ?? '';
 
-                return {
+                const pubDate =
+                    content.find('strong').first().text().trim() || undefined;
+
+                item.push({
                     title: entry.title,
                     link: entry.link,
                     description,
-                };
-            })
+                    pubDate,
+                });
+            } catch (error) {
+                console.log(`Skip: ${entry.link}`);
+
+                item.push({
+                    title: entry.title,
+                    link: entry.link,
+                });
+            }
+        }
+
+        const unique = Array.from(
+            new Map(item.map((v) => [v.link, v])).values()
         );
 
         return {
             title: 'Port of Los Angeles News',
             link: 'https://www.portoflosangeles.org',
-            item,
+            description: 'Latest news releases from the Port of Los Angeles',
+            item: unique,
         };
     },
 };
