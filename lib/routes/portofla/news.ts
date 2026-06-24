@@ -1,16 +1,23 @@
-import { Route } from '@/types';
+import { load } from 'cheerio';
+
+import type { Route } from '@/types';
+import { ViewType } from '@/types';
+import ofetch from '@/utils/ofetch';
 
 export const route: Route = {
     path: '/news',
-    name: 'Port of Los Angeles News',
-    url: 'https://portoflosangeles.org',
+    name: 'News Releases',
     maintainers: ['suinwen'],
-    handler: async (ctx) => {
-        const response = await ctx.got(
+    example: '/portofla/news',
+    categories: ['new-media'],
+    view: ViewType.Articles,
+
+    handler: async () => {
+        const html = await ofetch(
             'https://portoflosangeles.org/news/news-release-archive'
         );
 
-        const $ = ctx.cheerio.load(response.data);
+        const $ = load(html);
 
         const item = $('a')
             .toArray()
