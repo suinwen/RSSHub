@@ -60,28 +60,39 @@ export const route: Route = {
                                 headers: {
                                     'User-Agent':
                                         'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+                                    Referer:
+                                        'https://www.cbp.gov/',
                                 },
                             }
                         );
 
                         const article = load(articleHtml);
 
-                        const content = article(
-                            '.field--name-body'
-                        ).clone();
-
+                        // 导语
                         const intro = article(
                             '.field--name-field-page-header'
-                        ).html();
+                        )
+                            .first()
+                            .clone();
 
-                        if (intro) {
-                            content.prepend(intro);
+                        // 正文
+                        const body = article(
+                            'article .field--name-body'
+                        )
+                            .first()
+                            .clone();
+
+                        // 合并导语和正文
+                        if (intro.length) {
+                            body.prepend(intro);
                         }
 
-                        content.find('script').remove();
-                        content.find('style').remove();
-                        content.find('noscript').remove();
+                        // 清理无用内容
+                        body.find('script').remove();
+                        body.find('style').remove();
+                        body.find('noscript').remove();
 
+                        // 发布时间
                         const pubDate = article(
                             '.field--name-field-date-release .field__item'
                         )
@@ -94,9 +105,13 @@ export const route: Route = {
                             link: entry.link,
                             pubDate,
                             description:
-                                content.html() ?? '',
+                                body.html() ?? '',
                         };
                     } catch (error) {
+                        console.log(
+                            `Skip: ${entry.link}`
+                        );
+
                         return {
                             title: entry.title,
                             link: entry.link,
