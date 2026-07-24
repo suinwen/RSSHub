@@ -14,7 +14,7 @@ export const route: Route = {
 
     handler: async () => {
         const url =
-            'https://www.cbp.gov/trade/automated/cargo-systems-messaging-service';
+            'https://content.govdelivery.com/accounts/USDHSCBP/widgets/USDHSCBP_WIDGET_2';
 
         const html = await ofetch(url, {
             headers: {
@@ -35,7 +35,7 @@ export const route: Route = {
                 const title = a.text().trim();
                 const href = a.attr('href');
 
-                const date = $(el)
+                const pubDate = $(el)
                     .find('.pub_date')
                     .text()
                     .trim();
@@ -43,8 +43,8 @@ export const route: Route = {
                 if (href && title) {
                     return {
                         title,
-                        link: href,
-                        pubDate: date,
+                        link: href.split('?')[0],
+                        pubDate,
                     };
                 }
 
@@ -75,11 +75,6 @@ export const route: Route = {
 
                         content.find('script').remove();
                         content.find('style').remove();
-
-                        // 删除GovDelivery无用元素
-                        content.find(
-                            '.account_banner'
-                        ).remove();
 
                         // 图片地址修正
                         content.find('img').each((_, img) => {
@@ -122,9 +117,9 @@ export const route: Route = {
                             description:
                                 content.html() ?? '',
                         };
-                    } catch (error) {
+                    } catch (e) {
                         console.log(
-                            `Skip: ${entry.link}`
+                            `Skip ${entry.link}`
                         );
 
                         return {
@@ -141,9 +136,10 @@ export const route: Route = {
         return {
             title:
                 'CBP Cargo Systems Messaging Service',
-            link: url,
+            link:
+                'https://www.cbp.gov/trade/automated/cargo-systems-messaging-service',
             description:
-                'Latest CBP Cargo Systems Messaging Service (CSMS) messages',
+                'Latest CBP CSMS messages',
             item,
         };
     },
