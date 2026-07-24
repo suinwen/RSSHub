@@ -16,26 +16,53 @@ export const route: Route = {
         const widgetUrl =
             'https://content.govdelivery.com/accounts/USDHSCBP/widgets/USDHSCBP_WIDGET_2/0.json';
 
-        // 获取 GovDelivery Widget（返回的是 JS，不是 JSON）
         const js = await ofetch(widgetUrl, {
             responseType: 'text',
             headers: {
                 Referer: 'https://www.cbp.gov/',
                 Accept: '*/*',
                 'User-Agent':
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
+                    'Mozilla/5.0',
             },
         });
 
-        const match = js.match(
-            /GDWidgets\[0\]\.update\(([\s\S]*?)\);/
+        /**
+         * GovDelivery 返回:
+         * GDWidgets[0].update([...])
+         *
+         * 提取中括号内容
+         */
+        const start = js.indexOf(
+            'GDWidgets[0].update('
         );
 
-        if (!match) {
-            throw new Error('Unable to parse GovDelivery Widget');
+        if (start === -1) {
+            throw new Error(
+                'GovDelivery data not found'
+            );
         }
 
-        const links = JSON.parse(match[1])
+        const jsonStart =
+            js.indexOf('[', start);
+
+        const jsonEnd =
+            js.lastIndexOf(']');
+
+        if (
+            jsonStart === -1 ||
+            jsonEnd === -1
+        ) {
+            throw new Error(
+                'GovDelivery JSON block not found'
+            );
+        }
+
+        const jsonText = js.substring(
+            jsonStart,
+            jsonEnd + 1
+        );
+
+        const links = JSON.parse(jsonText)
             .slice(0, 30)
             .map((item: any) => ({
                 title: item.subject,
@@ -43,64 +70,60 @@ export const route: Route = {
                 pubDate: item.pub_date,
             }));
 
+
         const item = await Promise.all(
             links.map(async (entry: any) => {
                 try {
-                    const articleHtml = await ofetch(entry.link, {
-                        responseType: 'text',
-                        timeout: 10000,
-                        headers: {
-                            Referer: 'https://www.cbp.gov/',
-                            'User-Agent':
-                                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
-                        },
-                    });
-
-                    const article = load(articleHtml);
-
-                    const content = article('#bulletin_body').clone();
-
-                    content.find('script').remove();
-                    content.find('style').remove();
-                    content.find('noscript').remove();
-
-                    // 修正图片路径
-                    content.find('img').each((_, el) => {
-                        const src = article(el).attr('src');
-                        if (src && src.startsWith('/')) {
-                            article(el).attr(
-                                'src',
-                                'https://content.govdelivery.com' + src
-                            );
+                    const html = await ofetch(
+                        entry.link,
+                        {
+                            responseType: 'text',
+                            timeout: 15000,
+                            headers: {
+                                'User-Agent':
+                                    'Mozilla/5.0',
+                            },
                         }
-                    });
+                    );
 
-                    // 修正链接
-                    content.find('a').each((_, el) => {
-                        const href = article(el).attr('href');
-                        if (href && href.startsWith('/')) {
-                            article(el).attr(
-                                'href',
-                                'https://content.govdelivery.com' + href
-                            );
-                        }
-                    });
+                    const $ = load(html);
+
+                    const content =
+                        $('#bulletin_body')
+                            .clone();
+
+                    content.find(
+                        'script,style'
+                    ).remove();
+
 
                     return {
                         title:
-                            article('.bulletin_subject')
+                            $('.bulletin_subject')
                                 .first()
                                 .text()
-                                .trim() || entry.title,
+                                .trim() ||
+                            entry.title,
 
                         link: entry.link,
 
-                        pubDate: entry.pubDate,
+                        pubDate:
+                            $('.dateline')
+                                .first()
+                                .text()
+                                .trim() ||
+                            entry.pubDate,
 
-                        description: content.html() || '',
+                        description:
+                            content.html() || '',
                     };
+
                 } catch (e) {
-                    console.log(`Skip: ${entry.link}`);
+
+                    console.log(
+                        'Skip:',
+                        entry.link
+                    );
 
                     return {
                         title: entry.title,
@@ -111,10 +134,17 @@ export const route: Route = {
             })
         );
 
+
         return {
-            title: 'CBP Cargo Systems Messaging Service',
-            link: 'https://www.cbp.gov/trade/automated/cargo-systems-messaging-service',
-            description: 'Latest CBP CSMS Messages',
+            title:
+                'CBP Cargo Systems Messaging Service',
+
+            link:
+                'https://www.cbp.gov/trade/automated/cargo-systems-messaging-service',
+
+            description:
+                'Latest CBP CSMS Messages',
+
             item,
         };
     },
