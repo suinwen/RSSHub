@@ -1,151 +1,45 @@
-import { load } from 'cheerio';
+const got = require('@/utils/got');
+const { parseDate } = require('@/utils/parse-date');
+const cheerio = require('cheerio');
 
-import type { Route } from '@/types';
-import { ViewType } from '@/types';
-import ofetch from '@/utils/ofetch';
+module.exports = async (ctx) => {
+    const apiUrl = 'https://content.govdelivery.com/accounts/USDHSCBP/widgets/USDHSCBP_WIDGET_2.json';
 
-export const route: Route = {
-    path: '/csms',
-    name: 'Cargo Systems Messaging Service',
-    maintainers: ['suinwen'],
-    example: '/cbp/csms',
-    categories: ['government'],
-    view: ViewType.Articles,
+    const response = await got.get(apiUrl);
+    const items = response.data;
 
-    handler: async () => {
-        const widgetUrl =
-            'https://content.govdelivery.com/accounts/USDHSCBP/widgets/USDHSCBP_WIDGET_2/0.json';
+    const result = await Promise.all(
+        items.map(async (item) => {
+            const link = item.href.replace(/\?wgt_ref=.*$/, '');
+            let description = item.subject;
 
-        const js = await ofetch(widgetUrl, {
-            responseType: 'text',
-            headers: {
-                Referer: 'https://www.cbp.gov/',
-                Accept: '*/*',
-                'User-Agent':
-                    'Mozilla/5.0',
-            },
-        });
-
-        /**
-         * GovDelivery 返回:
-         * GDWidgets[0].update([...])
-         *
-         * 提取中括号内容
-         */
-        const start = js.indexOf(
-            'GDWidgets[0].update('
-        );
-
-        if (start === -1) {
-            throw new Error(
-                'GovDelivery data not found'
-            );
-        }
-
-        const jsonStart =
-            js.indexOf('[', start);
-
-        const jsonEnd =
-            js.lastIndexOf(']');
-
-        if (
-            jsonStart === -1 ||
-            jsonEnd === -1
-        ) {
-            throw new Error(
-                'GovDelivery JSON block not found'
-            );
-        }
-
-        const jsonText = js.substring(
-            jsonStart,
-            jsonEnd + 1
-        );
-
-        const links = JSON.parse(jsonText)
-            .slice(0, 30)
-            .map((item: any) => ({
-                title: item.subject,
-                link: item.href.split('?')[0],
-                pubDate: item.pub_date,
-            }));
-
-
-        const item = await Promise.all(
-            links.map(async (entry: any) => {
-                try {
-                    const html = await ofetch(
-                        entry.link,
-                        {
-                            responseType: 'text',
-                            timeout: 15000,
-                            headers: {
-                                'User-Agent':
-                                    'Mozilla/5.0',
-                            },
-                        }
-                    );
-
-                    const $ = load(html);
-
-                    const content =
-                        $('#bulletin_body')
-                            .clone();
-
-                    content.find(
-                        'script,style'
-                    ).remove();
-
-
-                    return {
-                        title:
-                            $('.bulletin_subject')
-                                .first()
-                                .text()
-                                .trim() ||
-                            entry.title,
-
-                        link: entry.link,
-
-                        pubDate:
-                            $('.dateline')
-                                .first()
-                                .text()
-                                .trim() ||
-                            entry.pubDate,
-
-                        description:
-                            content.html() || '',
-                    };
-
-                } catch (e) {
-
-                    console.log(
-                        'Skip:',
-                        entry.link
-                    );
-
-                    return {
-                        title: entry.title,
-                        link: entry.link,
-                        pubDate: entry.pubDate,
-                    };
+            // 尝试抓取详细内容
+            try {
+                const detailResponse = await got.get(link);
+                const $ = cheerio.load(detailResponse.data);
+                const bulletinBody = $('.bulletin_body, .bulletin, article, .main-content').html();
+                if (bulletinBody) {
+                    description = bulletinBody;
                 }
-            })
-        );
+            } catch {
+                // 抓取失败则使用标题作为内容
+            }
 
+            return {
+                title: item.subject,
+                description,
+                link,
+                pubDate: parseDate(item.pub_date),
+                author: 'CBP CSMS',
+            };
+        })
+    );
 
-        return {
-            title:
-                'CBP Cargo Systems Messaging Service',
-
-            link:
-                'https://www.cbp.gov/trade/automated/cargo-systems-messaging-service',
-
-            description:
-                'Latest CBP CSMS Messages',
-
-            item,
-        };
-    },
+    ctx.set('data', {
+        title: 'CBP CSMS - Cargo Systems Messaging Service',
+        link: 'https://www.cbp.gov/trade/automated/cargo-systems-messaging-service',
+        description: 'U.S. Customs and Border Protection (CBP) Cargo Systems Messaging Service - trade community updates on ACE and automated systems.',
+        language: 'en',
+        item: result,
+    });
 };
