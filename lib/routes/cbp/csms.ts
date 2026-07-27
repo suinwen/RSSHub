@@ -7,7 +7,7 @@ import { parseDate } from '@/utils/parse-date';
 export const route: Route = {
     path: '/cbp/csms',
     categories: ['government'],
-    example: '/gov/cbp/csms',
+    example: '/cbp/csms',
     parameters: undefined,
     features: {
         requireConfig: false,
