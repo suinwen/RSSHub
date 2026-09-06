@@ -16,6 +16,7 @@ describe('worker cache before KV binding', () => {
         expect(second).toEqual({ fresh: 1 });
         expect(getValue).toHaveBeenCalledTimes(2);
         expect(await cache.globalCache.get('worker:fallback')).toBeNull();
+        expect(await cache.globalCache.has('worker:fallback')).toBe(false);
     });
 });
 
@@ -72,5 +73,16 @@ describe('worker cache with KV binding', () => {
     it('exposes get/set through globalCache', async () => {
         await cache.globalCache.set('worker:global', { b: 2 }, 60);
         expect(await cache.globalCache.get('worker:global')).toBe('{"b":2}');
+    });
+
+    it('checks global cache existence without treating empty values as missing', async () => {
+        expect(await cache.globalCache.has('worker:global-missing')).toBe(false);
+        expect(await cache.globalCache.has('')).toBe(false);
+
+        await cache.globalCache.set('worker:global-existing', { lastBuildDate: 'Sat, 5 Sep 2026 00:00:00 GMT' }, 60);
+        expect(await cache.globalCache.has('worker:global-existing')).toBe(true);
+
+        await cache.globalCache.set('worker:global-empty', '', 60);
+        expect(await cache.globalCache.has('worker:global-empty')).toBe(true);
     });
 });

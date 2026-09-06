@@ -11,6 +11,7 @@ import kv, { getKVNamespace } from './kv';
 
 type GlobalCache = {
     get: (key: string) => Promise<string | null | undefined> | string | null | undefined;
+    has: (key: string) => Promise<boolean> | boolean;
     set: <T>(key: string, value?: string | T, maxAge?: number) => any;
     /**
      * Atomically set `key` to '1' and return true, unless it is already '1' (return false).
@@ -27,6 +28,7 @@ const globalCache: GlobalCache = {
         }
         return null;
     },
+    has: kv.has,
     set: async (key, value, maxAge = config.cache.routeExpire) => {
         if (!kv.status.available || !getKVNamespace()) {
             return;
